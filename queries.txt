@@ -1,0 +1,76 @@
+/* QUERY 1 - Query used for first insight*/
+SELECT f.title film_name, c.name category_name, COUNT(r.rental_id) num_of_rents
+FROM category c
+JOIN film_category fc
+ON fc.category_id = c.category_id
+JOIN film f
+ON f.film_id = fc.film_id
+JOIN inventory i 
+ON i.film_id = f.film_id
+JOIN rental r 
+ON r.inventory_id= i.inventory_id
+WHERE c.name IN ('Animation', 'Comedy', 'Children', 'Classics', 'Music', 'Music')
+GROUP BY 1,2;
+
+
+/* QUERY 2 - Query used for second insight*/
+WITH table1 AS 
+            (SELECT f.title film_name, c.name category_name, COUNT(r.rental_id) num_of_rents
+FROM category c
+JOIN film_category fc
+ON fc.category_id = c.category_id
+JOIN film f
+ON f.film_id = fc.film_id
+JOIN inventory i 
+ON i.film_id = f.film_id
+JOIN rental r 
+ON r.inventory_id= i.inventory_id
+WHERE c.name IN ('Animation', 'Comedy', 'Children', 'Classics', 'Music', 'Music')
+GROUP BY 1,2),
+
+     table2 AS 
+             (SELECT f.title movie_name, c.name movie_category, f.rental_duration rental_length, NTILE(4) OVER(PARTITION BY f.rental_duration ) standard_quartile
+FROM category c
+JOIN film_category fc
+ON fc.category_id = c.category_id
+JOIN film f
+ON f.film_id = fc.film_id
+WHERE c.name IN ('Animation', 'Comedy', 'Children', 'Classics', 'Music', 'Music'))
+
+SELECT movie_category, standard_quartile, COUNT(movie_name)
+FROM table1
+JOIN table2
+ON table1.film_name = table2.movie_name AND table1.category_name = table2.movie_category
+GROUP BY 1,2;
+
+
+/* QUERY 3 - Query used for third insight*/
+ SELECT DATE_PART('month',r.rental_date) rental_month, DATE_PART('year',r.rental_date) rental_year, s.store_id id, COUNT(r.rental_id) 
+FROM rental r
+JOIN staff sf
+ON sf.staff_id = r.staff_id
+JOIN store s
+ON s.store_id = sf.store_id
+GROUP BY 1,2,3
+ORDER BY 2;
+
+
+/* QUERY 4 - Query used for the fourth insight*/
+WITH table1 AS (SELECT c.customer_id id, CONCAT(first_name, ' ', last_name) full_name, SUM(p.amount) total_pay
+FROM customer c
+JOIN payment p
+ON p.customer_id = c.customer_id
+GROUP BY 1, 2
+ORDER BY 3 DESC
+LIMIT 10 ),
+
+table2 AS (SELECT DISTINCT c.customer_id id, DATE_TRUNC('month',p.payment_date) payment_month, SUM(p.amount) OVER (PARTITION BY c.customer_id, DATE_TRUNC('month',p.payment_date)) pay_amt_per_month, COUNT(p.amount) OVER (PARTITION BY c.customer_id, DATE_TRUNC('month',p.payment_date)) pay_count_per_month
+FROM customer c
+JOIN payment p
+ON p.customer_id = c.customer_id)
+
+SELECT DISTINCT t1.id, t1.full_name, t1.total_pay, t2.payment_month, t2.pay_amt_per_month, t2.pay_count_per_month counts
+FROM table1 t1
+LEFT JOIN table2 t2
+ON t2.id = t1.id
+ORDER BY 3 DESC;
